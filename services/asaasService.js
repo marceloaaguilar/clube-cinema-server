@@ -9,7 +9,7 @@ try {
     baseURL: process.env.ASAAS_BASE_URL,
     headers: {
       'Content-Type': 'application/json',
-      'access_token': `$${process.env.ASAAS_API_KEY}==`
+      'access_token': `$${process.env.ASAAS_API_KEY}`
     },
   });
 
@@ -31,6 +31,7 @@ const createCustomer = async (clientData) => {
 };
 
 const createAndConfirmPayment = async (bookVoucherData) => {
+
   try {
     const {clientData, paymentValue, voucherId, creditCard, creditCardHolderInfo, paymentMethod} = bookVoucherData;
 
@@ -43,11 +44,23 @@ const createAndConfirmPayment = async (bookVoucherData) => {
       dueDate: new Date(),
       description: "Clube Cinema - Voucher: " + voucherId
     }
-
-    const payment = await createPayment(paymentData, clientData);
-
+  
+    const billingId = await createAsaasPayment(paymentData, clientData);
+    
+    let payment = await Payment.create({
+      asaasId: billingId, 
+      memberCPF: clientData.cpfCnpj, 
+      paymentValue: paymentData.value, 
+      paymentDate: new Date(), 
+      paymentMethod: paymentData.billingType,
+    })
+    
     if (paymentMethod === "CREDIT_CARD") {
-      const confirmedPayment = await confirmPayment(payment?.id, creditCard, creditCardHolderInfo);
+      const confirmedPayment = await confirmAsaasPayment(billingId, creditCard, creditCardHolderInfo);
+
+      payment.status = 'paid';
+      await payment.save();
+
       return confirmedPayment;
     }
 
@@ -86,32 +99,29 @@ const getOrCreateClient = async (clientData) => {
   return clientExists.data[0].id;
 }
 
-const createPayment = async (paymentData, clientData) => {
+const createAsaasPayment = async (paymentData, clientData) => {
+
   try {
 
     const response = await asaasApi.post('/payments', paymentData);
-
-    if (response?.data) {
-      const responseData = response?.data;
-
-      const payment = await Payment.create({
-        asaasId: responseData.id, 
-        memberCPF: clientData.cpfCnpj, 
-        paymentValue: paymentData.value, 
-        paymentDate: new Date(), 
-        paymentMethod: paymentData.billingType
-      });
-
-      return response?.data;
-    }
+    return response.data.id;
 
   } catch (error) {
-    throw new Error(error.message);
+
+    const responseData = error.response?.data;
+
+    const message =
+      responseData?.message ||
+      (Array.isArray(responseData?.errors) ? responseData.errors.map((e) => e.description).join('; ') : '') ||
+      error.message;
+
+    throw new Error(message);
+    
   }
 
 }
 
-const confirmPayment = async (paymentId, creditCard, creditCardHolderInfo) => {
+const confirmAsaasPayment = async (paymentId, creditCard, creditCardHolderInfo) => {
 
   const bodyRequest = {
     creditCard: creditCard,
@@ -124,11 +134,18 @@ const confirmPayment = async (paymentId, creditCard, creditCardHolderInfo) => {
     return confirmedPayment;
 
   } catch (error) {
-    throw new Error('Erro ao confirmar pagamento: ' + error.message);
+
+    const responseData = error.response?.data;
+
+    const message =
+      responseData?.message ||
+      (Array.isArray(responseData?.errors) ? responseData.errors.map((e) => e.description).join('; ') : '') ||
+      error.message;
+
+    throw new Error(message);
   }
   
 }
-
 
 module.exports = {
   createCustomer,

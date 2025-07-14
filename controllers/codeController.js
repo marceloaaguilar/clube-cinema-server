@@ -38,23 +38,26 @@ exports.createCodes = catchAsync(async (req, res) => {
       vouchersToUpdate[[code.voucherId]] = (vouchersToUpdate[[code.voucherId]] || 0) + 1;
     }
 
-    const createdCodes = await Code.bulkCreate(codes);
-
-    if (createdCodes.length > 0) {
-
-      for (const voucherId of Object.keys(vouchersToUpdate)) {
-        let voucherData = await Voucher.findByPk(voucherId);
-        console.log(voucherData, voucherId);
-
-        if (voucherData) {
-          const newQuantity = voucherData.availableQuantity + vouchersToUpdate[voucherId];
-          await voucherData.update({ availableQuantity: newQuantity });
-          await voucherData.save();
-        }
-
-      }
+    if (!codes || codes.length === 0) {
+      return res.status(400).json({ error: "Não existem códigos para cadastrar!" });
     }
 
+    const createdCodes = await Code.bulkCreate(codes);
+    if (!createdCodes || createdCodes.length === 0) {
+      return res.status(400).json({ error: "Ocorreu um erro durante o cadastro dos códigos!" });
+    }
+
+    for (const voucherId of Object.keys(vouchersToUpdate)) {
+      let voucherData = await Voucher.findByPk(voucherId);
+
+      if (voucherData) {
+        const newQuantity = voucherData.availableQuantity + vouchersToUpdate[voucherId];
+        await voucherData.update({ availableQuantity: newQuantity });
+        await voucherData.save();
+      }
+
+    }
+    
     return res.status(201).json({ success: 'Os códigos foram cadastrados com sucesso!' });
 
   } catch (error) {

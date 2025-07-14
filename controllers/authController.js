@@ -9,7 +9,7 @@ const signToken = (id) => {
   return jwt.sign({id: id}, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN
   });
-}
+};
 
 async function correctPassword(candidatePassword, userPassword) {
   try {
@@ -90,6 +90,8 @@ exports.protect = catchAsync(async (req, res, next) => {
   let authToken;
   let decoded;
 
+  const FIXED_TOKEN = process.env.FIXED_JWT_TOKEN;
+
   if (req.headers && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     authToken = req.headers.authorization.split(' ')[1];
   }
@@ -103,6 +105,11 @@ exports.protect = catchAsync(async (req, res, next) => {
       error: true,
       message: "Você precisa se autenticar primeiro!'",
     })
+  }
+
+  if (authToken === FIXED_TOKEN) {
+    req.user = { id: 'clube-rede', role: 'external' };
+    return next();
   }
 
   try {

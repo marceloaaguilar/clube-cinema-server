@@ -3,6 +3,9 @@ const Voucher  = require('../models/voucher.js');
 const VoucherReservationHistory  = require('../models/voucherReservationHistory.js');
 const asaasApi = require('../services/asaasService.js');
 
+const {Op} = require("@sequelize/core")
+
+
 const Code = require("../models/code.js");
 
 exports.createVoucher = catchAsync(async (req, res, next) => {
@@ -68,11 +71,23 @@ exports.getAllVouchers = catchAsync(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
+    const cinema = req.query.cinema;
+    
+    let where = {
+      availableQuantity: {
+        [Op.gt]: 5
+      }
+    };
+
+    if (cinema) {
+      where.establishmentId = cinema;
+    }
 
     const { count, rows } = await Voucher.findAndCountAll({
       offset,
       limit,
       order: [['createdAt', 'DESC']],
+      where
     });
 
     return res.status(200).json({
@@ -131,24 +146,16 @@ exports.bookVoucher = async (req, res) => {
 
   try {
 
-    const {clientData, quantity, creditCard, creditCardHolderInfo, voucherId, paymentMethod} = req.body;
+    const {clientData, creditCard, creditCardHolderInfo, vouchers, paymentMethod} = req.body;
 
-    if (!quantity || quantity <= 0) {
-      return res.status(400).json({ message: 'Quantidade desejada é obrigatória e deve ser maior que zero.' });
-    }
+    const memberCPF = clientData?.cpfCnpj;
 
-    const voucher = await Voucher.findOne({where: {id: voucherId}});
+    if (!vouchers || vouchers.length === 0) {
+      return res.status(404).json({ message: 'É obrigatório fornecer pelo menos um voucher para compra.' });
+    };
 
-    if (!voucher) {
-      return res.status(404).json({ message: 'Voucher não encontrado.' });
-    }
-
-    if (voucher.availableQuantity < 5) {
-      return res.status(400).json({ message: 'O voucher possui menos de 5 códigos disponíveis.' });
-    }
-
-    if (voucher.availableQuantity < quantity) {
-      return res.status(400).json({ message: 'Quantidade solicitada maior que o estoque disponível.' });
+    if(vouchers.find((voucher)=> !voucher.quantity)){
+      return res.status(404).json({ message: 'Não foi informada a quantidade desejada para os vouchers.' });
     }
 
     if (!paymentMethod) return res.status(400).json({ message: 'É obrigatório fornecer o método de pagamento!' });
@@ -164,58 +171,73 @@ exports.bookVoucher = async (req, res) => {
       }
     }
 
-    const codesAvailable = await Code.findAll({
-      where: {
-        voucherId: voucher.id,
-        status: 'available'
-      },
-      order: [['sequential', 'ASC']], 
-      limit: quantity
-    });
+    for (const voucher of vouchers) {
 
-    if (!codesAvailable || codesAvailable.length === 0) return res.status(400).json({ message: 'Ocorreu um erro durante a reserva do voucher.' });
+      let voucherExists = await Voucher.findOne({where: {id: voucher.id}});
+      if (!voucherExists) {
+        return res.status(404).json({ message: 'Voucher não encontrado.' });
+      }
 
-    for (const code of codesAvailable) {
-      code.isLocked = true;
-      await code.save();
-    }
+      if (voucherExists.availableQuantity < 5) {
+        return res.status(400).json({ message: 'O voucher possui menos de 5 códigos disponíveis.' });
+      }
+  
+      if (voucherExists.availableQuantity < voucher.quantity) {
+        return res.status(400).json({ message: 'Quantidade solicitada maior que o estoque disponível.' });
+      }
+
+      let codesAvailable = await Code.findAll({
+        where: {
+          voucherId: voucher.id,
+          status: 'available'
+        },
+        order: [['sequential', 'ASC']], 
+        limit: voucher.quantity
+      });
+
+      if (!codesAvailable || codesAvailable.length === 0) return res.status(400).json({ message: 'Não há códigos disponíveis para o voucher: ' + voucher.id });
+
+      for (const code of codesAvailable) {
+        code.isLocked = true;
+        await code.save();
+      }
  
-    const paymentData = {
-      clientData: clientData,
-      paymentValue: voucher.paymentValue * quantity,
-      voucherId: voucher.id,
-      creditCard: creditCard,
-      paymentMethod: paymentMethod,
-      creditCardHolderInfo: creditCardHolderInfo
+      let paymentData = {
+        clientData: clientData,
+        paymentValue: voucherExists.paymentValue * voucher.quantity,
+        voucherId: voucher.id,
+        creditCard: creditCard,
+        paymentMethod: paymentMethod,
+        creditCardHolderInfo: creditCardHolderInfo
+      }
+
+      let paymentResult = await asaasApi.createAndConfirmPayment(paymentData);
+
+      if (!paymentResult || paymentResult.error) {
+        return res.status(500).json({ message: 'Erro ao comprar voucher', error: error.message });
+      }
+
+      voucherExists.availableQuantity -= voucher.quantity;
+      await voucherExists.save();
+
+      for (const code of codesAvailable) {
+        code.status = 'purchased';
+        code.isLocked = false;
+        await code.save();
+      }
+
+      await VoucherReservationHistory.create({
+        memberCPF,
+        voucherId: voucherExists.id,
+        quantity: voucher.quantity,
+        reservationStatus: 'completed',
+        paymentStatus: 'paid',
+        paymentValue: voucherExists.paymentValue * voucher.quantity,
+        reservationDate: new Date(),
+        paymentMethod: paymentMethod === "CREDIT_CARD" ? "CREDIT_CARD" : "PIX",
+      });
+
     }
-
-    const paymentResult = await asaasApi.createAndConfirmPayment(paymentData);
-
-    if (!paymentResult || paymentResult.error) {
-      return res.status(500).json({ message: 'Erro ao comprar voucher', error: error.message });
-    }
-
-    voucher.availableQuantity -= quantity;
-    await voucher.save();
-
-    for (const code of codesAvailable) {
-      code.status = 'purchased';
-      code.isLocked = false;
-      await code.save();
-    }
-
-    const memberCPF = clientData?.cpfCnpj;
-    
-    await VoucherReservationHistory.create({
-      memberCPF,
-      voucherId,
-      quantity,
-      reservationStatus: 'completed',
-      paymentStatus: 'paid',
-      paymentValue: voucher.paymentValue * quantity,
-      reservationDate: new Date(),
-      paymentMethod: paymentMethod === "CREDIT_CARD" ? "CREDIT_CARD" : "PIX",
-    });
 
     return res.status(201).json({ message: 'Voucher comprado com sucesso.' });
   } catch (error){
