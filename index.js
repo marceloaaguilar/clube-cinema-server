@@ -17,7 +17,25 @@ const cookieParser = require('cookie-parser');
 app.use(express.json());
 app.use(cookieParser());
 
-app.use(cors({origin: [process.env.CLUBE_CINEMA_CLIENT_URL, "http://localhost:5173"], credentials: true}));
+const allowedOrigins = [
+  process.env.CLUBE_CINEMA_CLIENT_URL,
+  "http://localhost:5173"
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true); // permite curl, postman etc.
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    } else {
+      return callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 204
+}));
+
+app.options('*', cors());
 
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/code", codeRoutes);
