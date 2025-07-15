@@ -6,10 +6,10 @@ let asaasApi;
 
 try {
   asaasApi = axios.create({
-    baseURL: process.env.ASAAS_BASE_URL,
+    baseURL: process.env.CLUBE_CINEMA_ASAAS_BASE_URL,
     headers: {
       'Content-Type': 'application/json',
-      'access_token': `$${process.env.ASAAS_API_KEY}`
+      'access_token': `$${process.env.CLUBE_CINEMA_ASAAS_API_KEY}`
     },
   });
 

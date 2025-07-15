@@ -78,7 +78,7 @@ exports.verifyToken = catchAsync(async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.CLUBE_CINEMA_JWT_SECRET);
     const user = await User.findOne({where: {id: decoded.id},attributes: { exclude: ['password'] }});
     
     return res.status(200).json({
