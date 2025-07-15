@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require("express");
-const userRoutes = require('./routes/users.js');
 
+const userRoutes = require('./routes/users.js');
 const establishmentRoutes = require('./routes/establishment.js');
 const clientRoutes = require('./routes/client.js');
 const memberRoutes = require('./routes/member.js');
@@ -19,14 +19,14 @@ app.use(cookieParser());
 
 app.use(cors({origin: [process.env.CLUBE_CINEMA_CLIENT_URL, "http://localhost:5173"], credentials: true}));
 
-app.use("/v1/user", userRoutes);
-app.use("/v1/code", codeRoutes);
-app.use("/v1/establishment", establishmentRoutes);
-app.use("/v1/client", clientRoutes);
-app.use("/v1/member", memberRoutes);
-app.use("/v1/voucher", voucherRoutes);
-app.use("/v1/voucherReservationHistory", voucherReservationHistory);
-app.use("/v1/webhook", webhook);
+app.use("/user", userRoutes);
+app.use("/code", codeRoutes);
+app.use("/establishment", establishmentRoutes);
+app.use("/client", clientRoutes);
+app.use("/member", memberRoutes);
+app.use("/voucher", voucherRoutes);
+app.use("/voucherReservationHistory", voucherReservationHistory);
+app.use("/webhook", webhook);
 
 app.listen(process.env.CLUBE_CINEMA_SERVER_PORT || 8080, () => {
   console.log("Servidor iniciado.")
