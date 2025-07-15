@@ -57,4 +57,6 @@ const Code = sequelize.define('Code', {
   
 }, { timestamps: true});
 
+Code.sync();
+
 module.exports = Code;

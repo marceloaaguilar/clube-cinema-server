@@ -86,6 +86,8 @@ const Voucher = sequelize.define('Voucher',
   { timestamps: true}
 );
 
+Voucher.sync();
+
 Voucher.hasMany(Code);
 
 module.exports = Voucher;
