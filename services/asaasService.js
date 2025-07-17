@@ -33,16 +33,16 @@ const createCustomer = async (clientData) => {
 const createAndConfirmPayment = async (bookVoucherData) => {
 
   try {
-    const {clientData, paymentValue, voucherId, creditCard, creditCardHolderInfo, paymentMethod} = bookVoucherData;
+    const {clientData, totalAmount,  creditCard, creditCardHolderInfo, paymentMethod} = bookVoucherData;
 
     const clientId = await getOrCreateClient(clientData);
 
     const paymentData = {
       customer: clientId,
       billingType: paymentMethod,
-      value: paymentValue,
+      value: totalAmount,
       dueDate: new Date(),
-      description: "Clube Cinema - Voucher: " + voucherId
+      description: "Clube Cinema - Vouchers"
     }
   
     const billingId = await createAsaasPayment(paymentData, clientData);

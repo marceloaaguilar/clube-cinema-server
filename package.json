@@ -24,6 +24,7 @@
     "multer-storage-cloudinary": "^4.0.0",
     "mysql": "^2.18.1",
     "mysql2": "^3.14.0",
+    "nodemailer": "^7.0.5",
     "nodemon": "^2.0.22",
     "pg": "^8.14.1",
     "postgres": "^3.4.5",

@@ -1,12 +1,14 @@
 const catchAsync = require('../utils/catchAsync.js');
 const Voucher  = require('../models/voucher.js');
 const VoucherReservationHistory  = require('../models/voucherReservationHistory.js');
+
 const asaasApi = require('../services/asaasService.js');
+const sendMailWithVouchers = require('../services/sendEmail.js');
 
 const {Op} = require("@sequelize/core")
 
-
 const Code = require("../models/code.js");
+const Order = require("../models/order.js");
 
 exports.createVoucher = catchAsync(async (req, res, next) => {
 
@@ -89,9 +91,11 @@ exports.createVoucher = catchAsync(async (req, res, next) => {
     return res.status(201).json(newVoucher);
 
   } catch (error) {
+
     if (error.name === 'SequelizeUniqueConstraintError') {
       return res.status(400).json({ error: 'Este código de voucher já está em uso' });
     }
+
     return res.status(400).json({ error: error.message });
   }
 })
@@ -173,11 +177,11 @@ exports.getVoucher = catchAsync(async (req, res, next) => {
 
 exports.bookVoucher = async (req, res) => {
 
-  let codeIsAvailable;
-
   try {
 
     const {clientData, creditCard, creditCardHolderInfo, vouchers, paymentMethod} = req.body;
+    let reservations = [];
+    let codes = [];
 
     const memberCPF = clientData?.cpfCnpj;
 
@@ -202,73 +206,114 @@ exports.bookVoucher = async (req, res) => {
       }
     }
 
-    for (const voucher of vouchers) {
+    const allVouchers = await Promise.all(
+      vouchers.map(async (voucher) => {
+        const voucherExists = await Voucher.findOne({ where: { id: voucher.id } })
 
-      let voucherExists = await Voucher.findOne({where: {id: voucher.id}});
-      if (!voucherExists) {
-        return res.status(404).json({ message: 'Voucher não encontrado.' });
-      }
+        if (!voucherExists) {
+          throw new Error(`Voucher não encontrado: ${voucher.id}`)
+        }
 
-      if (voucherExists.availableQuantity < 5) {
-        return res.status(400).json({ message: 'O voucher possui menos de 5 códigos disponíveis.' });
-      }
-  
-      if (voucherExists.availableQuantity < voucher.quantity) {
-        return res.status(400).json({ message: 'Quantidade solicitada maior que o estoque disponível.' });
-      }
+        if (voucherExists.availableQuantity < 5) {
+          throw new Error(`O voucher ${voucher.id} possui menos de 5 códigos disponíveis.`)
+        }
 
-      let codesAvailable = await Code.findAll({
+        if (voucherExists.availableQuantity < voucher.quantity) {
+          throw new Error(`Quantidade solicitada maior que o estoque disponível para o voucher: ${voucher.id}`)
+        }
+
+        const codesAvailable = await Code.findAll({
+          where: {
+            voucherId: voucher.id,
+            status: 'available'
+          },
+          order: [['sequential', 'ASC']],
+          limit: voucher.quantity
+        });
+
+
+        if (!codesAvailable || codesAvailable.length === 0) {
+          throw new Error(`Não há códigos disponíveis para o voucher: ${voucher.id}`)
+        }
+
+        codes.push(...codesAvailable);
+
+        await Promise.all(
+          codesAvailable.map(async (code) => {
+            code.isLocked = true
+            await code.save()
+          })
+        )
+
+        return {
+          id: voucherExists.id,
+          name: voucherExists.name,
+          paymentValue: Number(voucherExists.paymentValue),
+          quantity: voucher.quantity,
+          codes: codesAvailable.map((c) => c.barCode)
+        }
+      })
+    )
+
+    const totalAmount = allVouchers.reduce(
+      (acc, voucher) => acc + voucher.paymentValue * voucher.quantity,
+      0
+    )
+
+    let paymentData = {
+      clientData: clientData,
+      totalAmount,
+      creditCard: creditCard,
+      paymentMethod: "CREDIT_CARD",
+      creditCardHolderInfo: creditCardHolderInfo
+    }
+
+    let paymentResult = await asaasApi.createAndConfirmPayment(paymentData);
+    if (!paymentResult || paymentResult.error) {
+      return res.status(500).json({ message: 'Erro ao comprar voucher', error: error.message });
+    }
+
+    for (const voucher of allVouchers) {
+      const voucherRecord = await Voucher.findOne({ where: { id: voucher.id } })
+      voucherRecord.availableQuantity -= voucher.quantity
+      await voucherRecord.save()
+
+      const codes = await Code.findAll({
         where: {
-          voucherId: voucher.id,
-          status: 'available'
-        },
-        order: [['sequential', 'ASC']], 
-        limit: voucher.quantity
-      });
+          barCode: voucher.codes
+        }
+      })
 
-      if (!codesAvailable || codesAvailable.length === 0) return res.status(400).json({ message: 'Não há códigos disponíveis para o voucher: ' + voucher.id });
+      await Promise.all(
+        codes.map(async (code) => {
+          code.status = 'purchased'
+          code.isLocked = false
+          await code.save()
+        })
+      )
 
-      for (const code of codesAvailable) {
-        code.isLocked = true;
-        await code.save();
-      }
- 
-      let paymentData = {
-        clientData: clientData,
-        paymentValue: voucherExists.paymentValue * voucher.quantity,
-        voucherId: voucher.id,
-        creditCard: creditCard,
-        paymentMethod: paymentMethod,
-        creditCardHolderInfo: creditCardHolderInfo
-      }
-
-      let paymentResult = await asaasApi.createAndConfirmPayment(paymentData);
-
-      if (!paymentResult || paymentResult.error) {
-        return res.status(500).json({ message: 'Erro ao comprar voucher', error: error.message });
-      }
-
-      voucherExists.availableQuantity -= voucher.quantity;
-      await voucherExists.save();
-
-      for (const code of codesAvailable) {
-        code.status = 'purchased';
-        code.isLocked = false;
-        await code.save();
-      }
-
-      await VoucherReservationHistory.create({
+      reservations.push({
         memberCPF,
-        voucherId: voucherExists.id,
+        voucherId: voucher.id,
         quantity: voucher.quantity,
         reservationStatus: 'completed',
-        paymentStatus: 'paid',
-        paymentValue: voucherExists.paymentValue * voucher.quantity,
+        paymentValue: voucher.paymentValue * voucher.quantity,
         reservationDate: new Date(),
-        paymentMethod: paymentMethod === "CREDIT_CARD" ? "CREDIT_CARD" : "PIX",
-      });
-
+      })
     }
+
+    const order = await Order.create({
+      customerName: clientData.name,
+      customerEmail: clientData.email,
+      totalAmount,
+      status: 'paid',
+      paymentMethod,
+    });
+ 
+    const reservationsWithOrderId = reservations.map((reservation) => ({...reservation, orderNumber: order.orderNumber}))
+    VoucherReservationHistory.bulkCreate(reservationsWithOrderId);
+
+    sendMailWithVouchers(order, codes);
 
     return res.status(201).json({ message: 'Voucher comprado com sucesso.' });
 
@@ -279,12 +324,7 @@ exports.bookVoucher = async (req, res) => {
       error: error.message || error 
     });
 
-  } finally {
-    if (codeIsAvailable) {
-      codeIsAvailable.isLocked = false;
-      await codeIsAvailable.save();
-    }
-  };
+  }
 }
 
 exports.deleteVoucher = async (req, res) => {

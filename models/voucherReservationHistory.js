@@ -33,10 +33,10 @@ const VoucherReservationHistory = sequelize.define('VoucherReservationHistory', 
     type: DataTypes.ENUM('pending', 'completed', 'canceled'),
     allowNull: false,
     defaultValue: 'pending',
-  },  
-  paymentStatus: {
-    type: DataTypes.ENUM('pending', 'paid', 'failed', 'refunded', 'acquired', 'free_acquired'),
-    allowNull: true,
+  },
+  orderNumber: {
+    type: DataTypes.UUID,
+    allowNull: false,
   },
   paymentValue: {
     type: DataTypes.DECIMAL(10, 2),
@@ -45,13 +45,9 @@ const VoucherReservationHistory = sequelize.define('VoucherReservationHistory', 
   reservationDate: {
     type: DataTypes.DATE,
     allowNull: false,
-  },
-  paymentMethod: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
+  }
 }, { timestamps: true });
 
-VoucherReservationHistory.sync();
+VoucherReservationHistory.sync({alter: true});
 
 module.exports = VoucherReservationHistory;
