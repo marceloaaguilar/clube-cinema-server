@@ -39,12 +39,12 @@ const Voucher = sequelize.define('Voucher',
       type: DataTypes.TEXT,
       allowNull: true,
     },
-    voucherValue: {
+    paymentValue: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       validate: {
-        isDecimal: { msg: 'O valor do voucher deve ser um número válido' },
-        notNull: { msg: 'O valor do voucher é obrigatório' },
+        notNull: { msg: 'O valor de compra do voucher é obrigatório' },
+        isDecimal: { msg: 'O valor do pagamento deve ser um número válido' },
       },
     },
     availableQuantity: {
@@ -73,14 +73,6 @@ const Voucher = sequelize.define('Voucher',
       type: DataTypes.ENUM('active', 'expired', 'sold_out', 'hidden', 'awaiting_payment'),
       defaultValue: 'active',
       allowNull: false,
-    },
-    paymentValue: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
-      validate: {
-        notNull: { msg: 'O valor de compra do voucher é obrigatório' },
-        isDecimal: { msg: 'O valor do pagamento deve ser um número válido' },
-      },
     },
   },
   { timestamps: true}

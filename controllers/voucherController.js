@@ -15,8 +15,8 @@ exports.createVoucher = catchAsync(async (req, res, next) => {
       expirationDate,
       title,
       description,
-      voucherValue,
       establishmentId,
+      codes,
       status,
       paymentRequired,
       paymentValue
@@ -34,11 +34,6 @@ exports.createVoucher = catchAsync(async (req, res, next) => {
       return res.status(400).json({ error: 'A descrição é obrigatória' });
     }
 
-    if (!voucherValue || isNaN(voucherValue) || voucherValue <= 0) {
-      return res.status(400).json({ error: 'O valor do voucher deve ser um número positivo' });
-    }
-
-
     if (!establishmentId) {
       return res.status(400).json({ error: 'O ID do estabelecimento é obrigatório' });
     }
@@ -53,7 +48,43 @@ exports.createVoucher = catchAsync(async (req, res, next) => {
       return res.status(400).json({ error: 'Status inválido' });
     }
 
+    for (const [index, code] of (codes || []).entries()) {
+
+      if (!code.sequential) {
+        return res.status(400).json({ error: `Não foi informado o sequencial do código! Linha: ${index}` });
+      }
+
+      if (!code.shippingBatch) {
+        return res.status(400).json({ error: `Não foi informado o lote de envio do código! Sequencial: ${code.sequential}` });
+      }
+
+      if (!code.barCode) {
+        return res.status(400).json({ error: `Não foi informado o código de barras! Sequencial: ${code.sequential}` });
+      }
+
+      if (!code.expirationDate) {
+        return res.status(400).json({ error: `Não foi informada a data de validade do código! Sequencial: ${code.sequential}` });
+      }
+
+      const codeExists = await Code.findOne({ where: { barCode: code.barCode } });
+      if (codeExists) {
+        return res.status(400).json({ error: `Já existe um código cadastrado com este código de barras: ${code.barCode}` });
+      }
+
+    }
+
+    if (!codes || codes.length === 0) {
+      return res.status(400).json({ error: "Não existem códigos para cadastrar!" });
+    }
+
     const newVoucher = await Voucher.create(req.body);
+
+    const voucherId = newVoucher.id;
+    const codesToRegister = codes.map(code => ({...code, voucherId}));
+    await Code.bulkCreate(codesToRegister);
+
+    await newVoucher.update({ availableQuantity: codesToRegister.length });
+    await newVoucher.save();
 
     return res.status(201).json(newVoucher);
 
@@ -240,6 +271,7 @@ exports.bookVoucher = async (req, res) => {
     }
 
     return res.status(201).json({ message: 'Voucher comprado com sucesso.' });
+
   } catch (error){
 
       return res.status(500).json({ 
@@ -253,4 +285,42 @@ exports.bookVoucher = async (req, res) => {
       await codeIsAvailable.save();
     }
   };
+}
+
+exports.deleteVoucher = async (req, res) => {
+
+  try {
+
+    let voucher = req.params.id;
+    if (!voucher) {
+      return res.status(404).json({ status: 'fail', message: 'Voucher não encontrado' });
+    };
+
+    const voucherReservations = await VoucherReservationHistory.findAll({
+      where: {voucherId: voucher}
+    });
+
+    if (voucherReservations && voucherReservations.length > 0) {
+      return res.status(500).json({ message: 'Não é possível excluir vouchers com histórico de compra' });
+    }
+
+    await Code.destroy({
+      where: {voucherId: voucher}
+    });
+
+    await Voucher.destroy({
+      where: {id: voucher},
+    });
+
+    return res.status(201).json({ message: 'Voucher excluido com sucesso.' });
+
+  } catch (error){
+
+    return res.status(500).json({ 
+     message: (error.message || 'Erro desconhecido'), 
+      error: error.message || error 
+    });
+
+  }
+
 }

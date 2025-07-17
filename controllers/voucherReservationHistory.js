@@ -1,6 +1,7 @@
 const VoucherReservationHistory  = require('../models/voucherReservationHistory');
 
 exports.create = async (req, res) => {
+
   try {
     const {
       memberCPF,
@@ -26,6 +27,7 @@ exports.create = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: 'Erro ao criar reserva', error: error.message });
   }
+  
 };
 
 exports.list = async (req, res) => {

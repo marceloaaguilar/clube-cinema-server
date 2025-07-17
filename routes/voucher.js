@@ -19,6 +19,7 @@ router
 router
   .route('/:id')
   .get(authController.protect, voucherController.getVoucher)
+  .delete(authController.protect, voucherController.deleteVoucher)
 
 
 

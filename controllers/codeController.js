@@ -4,6 +4,7 @@ const Code = require("../models/code");
 const Voucher = require("../models/voucher");
 
 exports.createCodes = catchAsync(async (req, res) => {
+  
   try {
     const codes = req.body;
     let vouchersToUpdate = {};
