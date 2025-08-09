@@ -35,7 +35,6 @@ exports.getAllClients = catchAsync(async (req, res) => {
 
 exports.getClient = catchAsync(async (req, res, next) => {
 
-
   const client = await Client.findOne({where: {id: req.params.id}});
 
   if (!client) {

@@ -1,7 +1,12 @@
 const catchAsync = require("../utils/catchAsync");
 
 const Code = require("../models/code");
+const Order = require("../models/order");
 const Voucher = require("../models/voucher");
+const VoucherReservationHistory = require("../models/voucherReservationHistory");
+
+const sendMailWithVouchers = require('../services/sendEmail.js');
+
 
 exports.createCodes = catchAsync(async (req, res) => {
   
@@ -65,3 +70,93 @@ exports.createCodes = catchAsync(async (req, res) => {
     return res.status(400).json({ error: error.message });
   }
 });
+
+exports.getCodesByVoucherId = catchAsync(async(req, res) => {
+  try {
+
+    const { voucherId } = req.params;
+
+    if (!voucherId) return res.status(400).json({ error: 'Não foi informado o id do voucher!'});
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const { count, rows } = await Code.findAndCountAll({where: {voucherId: voucherId}, offset, limit, order: [['createdAt', 'DESC']],});
+
+    return res.status(200).json({
+      ages: Math.ceil(count / limit),
+      vouchers: rows,
+    });
+
+  } catch {
+    return res.status(500).json({ error: 'Erro ao buscar códigos: ' + error });
+  }
+});
+
+exports.createManualSale = catchAsync(async(req,res) => {
+
+  const {codeId, customerCpf, customerName, customerEmail, recieveEmail} = req.body;
+
+  if (!codeId) return res.status(404).json({ message: 'Não foi informado o id do código para venda manual!'});
+  if (!customerCpf) return res.status(404).json({ message: 'Não foi informado o CPF do Comprador para venda manual!'});
+  if (!customerName) return res.status(404).json({ message: 'Não foi informado o Nome do Comprador para venda manual!'});
+  if (!customerEmail) return res.status(404).json({ message: 'Não foi informado o E-mail do Comprador para venda manual!'});
+
+  try {
+    const { customerName, customerCpf, customerEmail, recieveEmail } = req.body;
+
+    const code = await Code.findOne({ where: { id: codeId } });
+    if (!code) {
+      return res.status(400).json({ error: 'Não foi encontrado nenhum código com este ID!' });
+    }
+
+    const voucherFromCode = await Voucher.findOne({ where: { id: code.voucherId } });
+    if (!voucherFromCode) {
+      return res.status(400).json({ error: 'Voucher não encontrado para o código informado!' });
+    };
+
+    voucherFromCode.availableQuantity -= 1;
+    await voucherFromCode.save();
+
+    const totalAmount = voucherFromCode.paymentValue || 0.00;
+
+    const orderData = await Order.create({
+      customerName,
+      customerCpf,
+      customerEmail,
+      paymentMethod: "PIX", 
+      totalAmount,
+      status: 'paid',
+    });
+
+    await VoucherReservationHistory.create({
+      memberCPF: customerCpf,
+      voucherId: voucherFromCode.id,
+      orderNumber: orderData.orderNumber,
+      quantity: 1,
+      barCode: code.barCode,
+      reservationStatus: 'completed',
+      paymentValue: totalAmount,
+      reservationDate: new Date(),
+    });
+
+    code.status = "purchased";
+    await code.save();
+
+    if (recieveEmail) {
+      try {
+        sendMailWithVouchers(orderData, [code]);
+      } catch (emailError) {
+        console.warn("Erro ao enviar e-mail:", emailError);
+      }
+    }
+
+    return res.status(201).json({ message: 'Venda Manual realizada com sucesso!' });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Erro ao realizar venda manual", error: error.message });
+  }
+
+})

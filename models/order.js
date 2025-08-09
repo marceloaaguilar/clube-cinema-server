@@ -1,6 +1,5 @@
 const {DataTypes} = require('sequelize');
 const sequelize = require('../config/database');
-const VoucherReservationHistory = require('../models/voucherReservationHistory.js')
 
 const Order = sequelize.define('Order', {
   id: {
@@ -13,6 +12,10 @@ const Order = sequelize.define('Order', {
     unique: true,
   },
   customerName: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  customerCpf: {
     type: DataTypes.STRING,
     allowNull: false,
   },
@@ -54,11 +57,6 @@ Order.beforeCreate(async (order) => {
   }
 
   order.orderNumber = `${prefix}${nextNumber}`
-})
+});
 
-Order.hasMany(VoucherReservationHistory, {
-  foreignKey: 'orderId',
-  as: 'voucherHistories',
-})
-
-module.exports = Order
+module.exports = Order;

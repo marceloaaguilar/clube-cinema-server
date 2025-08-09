@@ -60,7 +60,7 @@ exports.signin = async (req, res, next) => {
     })
   }
 
-  const user = await User.findOne({email: email});
+  const user = await User.findOne({where: {email: email}});
   
   if (!user || !await correctPassword(password, user.password)) {
     return res.status(401).json({

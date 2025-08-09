@@ -22,11 +22,12 @@ const VoucherReservationHistory = sequelize.define('VoucherReservationHistory', 
       key: 'id',
     },
   },
-  quantity: {
-    type: DataTypes.INTEGER,
+  barCode: {
+    type: DataTypes.STRING,
     allowNull: false,
-    validate: {
-      notEmpty: { msg: 'A quantidade desejada é obrigatória' },
+    unique: true,
+     validate: {
+      notNull: { msg: 'O Código de Barras do Código é obrigatório' },
     },
   },
   reservationStatus: {
@@ -35,7 +36,7 @@ const VoucherReservationHistory = sequelize.define('VoucherReservationHistory', 
     defaultValue: 'pending',
   },
   orderNumber: {
-    type: DataTypes.UUID,
+    type: DataTypes.STRING,
     allowNull: false,
   },
   paymentValue: {
@@ -48,6 +49,4 @@ const VoucherReservationHistory = sequelize.define('VoucherReservationHistory', 
   }
 }, { timestamps: true });
 
-VoucherReservationHistory.sync({alter: true});
-
-module.exports = VoucherReservationHistory;
+module.exports = VoucherReservationHistory

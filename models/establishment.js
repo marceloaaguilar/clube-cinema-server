@@ -28,6 +28,4 @@ const Establishment = sequelize.define('Establishment', {
   },
 );
 
-Establishment.sync({ alter: false});
-
 module.exports = Establishment

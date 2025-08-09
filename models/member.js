@@ -70,6 +70,5 @@ const Member = sequelize.define('Member', {
   },
 );
 
-Member.sync({ force: false });
 
 module.exports = Member

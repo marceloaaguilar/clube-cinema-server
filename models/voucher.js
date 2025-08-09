@@ -19,6 +19,11 @@ const Voucher = sequelize.define('Voucher',
         notNull: { msg: 'A data de validade é obrigatória' },
       },
     },
+    active: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true
+    },
     title: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -78,7 +83,7 @@ const Voucher = sequelize.define('Voucher',
   { timestamps: true}
 );
 
-Voucher.sync();
+Voucher.sync({alter: true});
 
 Voucher.hasMany(Code);
 

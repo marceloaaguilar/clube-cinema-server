@@ -92,6 +92,4 @@ User.findOne({
   attributes: { exclude: ['password'] }
 });
 
-User.sync({ force: false });
-
 module.exports = User

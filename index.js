@@ -8,6 +8,7 @@ const memberRoutes = require('./routes/member.js');
 const voucherRoutes = require('./routes/voucher.js');
 const voucherReservationHistory = require("./routes/voucherReservationHistory.js");
 const codeRoutes = require('./routes/code.js');
+const orderRoutes = require('./routes/orders.js');
 
 const webhook = require('./routes/asaasWebhook');
 const cors = require('cors');
@@ -26,6 +27,7 @@ app.use("/client", clientRoutes);
 app.use("/member", memberRoutes);
 app.use("/voucher", voucherRoutes);
 app.use("/voucherReservationHistory", voucherReservationHistory);
+app.use("/orders", orderRoutes);
 app.use("/webhook", webhook);
 
 app.listen(process.env.CLUBE_CINEMA_SERVER_PORT || 8080, () => {

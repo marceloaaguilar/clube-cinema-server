@@ -52,14 +52,6 @@ exports.createVoucher = catchAsync(async (req, res, next) => {
 
     for (const [index, code] of (codes || []).entries()) {
 
-      if (!code.sequential) {
-        return res.status(400).json({ error: `Não foi informado o sequencial do código! Linha: ${index}` });
-      }
-
-      if (!code.shippingBatch) {
-        return res.status(400).json({ error: `Não foi informado o lote de envio do código! Sequencial: ${code.sequential}` });
-      }
-
       if (!code.barCode) {
         return res.status(400).json({ error: `Não foi informado o código de barras! Sequencial: ${code.sequential}` });
       }
@@ -83,6 +75,7 @@ exports.createVoucher = catchAsync(async (req, res, next) => {
 
     const voucherId = newVoucher.id;
     const codesToRegister = codes.map(code => ({...code, voucherId}));
+
     await Code.bulkCreate(codesToRegister);
 
     await newVoucher.update({ availableQuantity: codesToRegister.length });
@@ -231,7 +224,6 @@ exports.bookVoucher = async (req, res) => {
           limit: voucher.quantity
         });
 
-
         if (!codesAvailable || codesAvailable.length === 0) {
           throw new Error(`Não há códigos disponíveis para o voucher: ${voucher.id}`)
         }
@@ -290,28 +282,33 @@ exports.bookVoucher = async (req, res) => {
           code.isLocked = false
           await code.save()
         })
-      )
+      );
 
-      reservations.push({
-        memberCPF,
-        voucherId: voucher.id,
-        quantity: voucher.quantity,
-        reservationStatus: 'completed',
-        paymentValue: voucher.paymentValue * voucher.quantity,
-        reservationDate: new Date(),
+      codes.map((code) => {
+        reservations.push({
+          memberCPF,
+          voucherId: voucher.id,
+          quantity: voucher.quantity,
+          barCode: code.barCode,
+          reservationStatus: 'completed',
+          paymentValue: voucher.paymentValue * voucher.quantity,
+          reservationDate: new Date(),
+        })
       })
+
     }
 
     const order = await Order.create({
       customerName: clientData.name,
+      customerCpf: memberCPF,
       customerEmail: clientData.email,
       totalAmount,
       status: 'paid',
       paymentMethod,
     });
  
-    const reservationsWithOrderId = reservations.map((reservation) => ({...reservation, orderNumber: order.orderNumber}))
-    VoucherReservationHistory.bulkCreate(reservationsWithOrderId);
+    const reservationsWithOrderId = reservations.map((reservation) => ({...reservation, orderNumber: order.orderNumber}));
+    await VoucherReservationHistory.bulkCreate(reservationsWithOrderId);
 
     sendMailWithVouchers(order, codes);
 
@@ -325,7 +322,7 @@ exports.bookVoucher = async (req, res) => {
     });
 
   }
-}
+};
 
 exports.deleteVoucher = async (req, res) => {
 
@@ -363,4 +360,55 @@ exports.deleteVoucher = async (req, res) => {
 
   }
 
+};
+
+exports.updateVoucher = async(req,res) => {
+
+  try {
+
+    const {id } = req.params;
+    const {codes} = req.body;
+
+    if (!id) return res.status(400).json({ error: 'O código do voucher não foi informado!' });
+
+    const voucher = await Voucher.findOne({where: {id}});
+    if (!voucher) return res.status(400).json({ error: 'Não foi encontrado nenhum voucher com este ID!' });
+
+    for (const [index, code] of (codes || []).entries()) {
+
+      if (!code.barCode) {
+        return res.status(400).json({ error: `Não foi informado o código de barras! Sequencial: ${code.sequential}` });
+      }
+
+      if (!code.expirationDate) {
+        return res.status(400).json({ error: `Não foi informada a data de validade do código! Sequencial: ${code.sequential}` });
+      }
+
+      const codeExists = await Code.findOne({ where: { barCode: code.barCode } });
+      if (codeExists) {
+        return res.status(400).json({ error: `Já existe um código cadastrado com este código de barras: ${code.barCode}` });
+      }
+
+    };
+
+    if (codes && codes.length > 0 ) {
+
+      const voucherId = id;
+      const codesToRegister = codes.map(code => ({...code, voucherId}));
+      await Code.bulkCreate(codesToRegister);
+
+      voucher.availableQuantity += codes.length;
+
+    } 
+
+
+    await voucher.update(req.body);
+    await voucher.save();
+
+    return res.status(200).json(voucher);
+
+
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao atualizar voucher: ' + error });
+  }
 }

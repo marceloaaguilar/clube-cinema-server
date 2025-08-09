@@ -16,18 +16,9 @@ const Code = sequelize.define('Code', {
     },
   },
   sequential: {
-    type: DataTypes.FLOAT,
-    allowNull: false,
-    validate: {
-      notNull: { msg: 'O Sequencial do código é obrigatório' },
-    }
-  },
-  shippingBatch: {
-    type: DataTypes.FLOAT,
-    allowNull: false,
-    validate: {
-      notNull: { msg: 'O Lote de Envio do código é obrigatório' },
-    }
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    unique: true,
   },
   barCode: {
     type: DataTypes.STRING,
@@ -56,7 +47,5 @@ const Code = sequelize.define('Code', {
   }
   
 }, { timestamps: true});
-
-Code.sync();
 
 module.exports = Code;
