@@ -48,6 +48,6 @@ const Code = sequelize.define('Code', {
   
 }, { timestamps: true});
 
-Voucher.sync({alter: true});
+Code.sync({alter: true});
 
 module.exports = Code;

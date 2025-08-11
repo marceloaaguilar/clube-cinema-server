@@ -59,4 +59,6 @@ Order.beforeCreate(async (order) => {
   order.orderNumber = `${prefix}${nextNumber}`
 });
 
+Order.sync({alter: true});
+
 module.exports = Order;

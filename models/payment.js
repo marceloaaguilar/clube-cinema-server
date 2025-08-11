@@ -38,6 +38,6 @@ const Payment = sequelize.define("Payment", {
   },
 });
 
-Voucher.sync({alter: true});
+Payment.sync({alter: true});
 
 module.exports = Payment;
