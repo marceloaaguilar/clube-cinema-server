@@ -49,4 +49,6 @@ const VoucherReservationHistory = sequelize.define('VoucherReservationHistory', 
   }
 }, { timestamps: true });
 
+Voucher.sync({alter: true});
+
 module.exports = VoucherReservationHistory

@@ -83,7 +83,7 @@ const Voucher = sequelize.define('Voucher',
   { timestamps: true}
 );
 
-Voucher.sync({alter: true});
+Voucher.sync({alter: false});
 
 Voucher.hasMany(Code);
 
