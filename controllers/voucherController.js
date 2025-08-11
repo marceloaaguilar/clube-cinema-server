@@ -85,10 +85,6 @@ exports.createVoucher = catchAsync(async (req, res, next) => {
 
   } catch (error) {
 
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({ error: 'Este código de voucher já está em uso' });
-    }
-
     return res.status(400).json({ error: error.message });
   }
 })
