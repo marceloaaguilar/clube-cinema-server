@@ -3,7 +3,7 @@ require('dotenv').config();
 const nodemailer = require('nodemailer');
 const generateVoucherEmail = require('../emails/templateEmail');
 
-async function sendMailWithVouchers(order, codes) {
+async function sendMailWithVouchers(order, codes, instructions) {
 
   const transporter = nodemailer.createTransport({
     host: 'smtp.hostinger.com',
@@ -23,7 +23,8 @@ async function sendMailWithVouchers(order, codes) {
     orderNumber,
     reservationDate,
     totalAmount,
-    codes: codes, 
+    codes: codes,
+    instructions
   });
 
   const mailOptions = {

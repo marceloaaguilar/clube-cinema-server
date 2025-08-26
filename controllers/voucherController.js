@@ -72,8 +72,8 @@ exports.createVoucher = catchAsync(async (req, res, next) => {
     }
 
     const newVoucher = await Voucher.create(req.body);
-
     const voucherId = newVoucher.id;
+    
     const codesToRegister = codes.map(code => ({...code, voucherId}));
 
     await Code.bulkCreate(codesToRegister);
@@ -171,6 +171,7 @@ exports.bookVoucher = async (req, res) => {
     const {clientData, creditCard, creditCardHolderInfo, vouchers, paymentMethod} = req.body;
     let reservations = [];
     let codes = [];
+    let instructions = [];
 
     const memberCPF = clientData?.cpfCnpj;
 
@@ -225,6 +226,7 @@ exports.bookVoucher = async (req, res) => {
         }
 
         codes.push(...codesAvailable);
+        instructions.push(voucherExists.rules);
 
         await Promise.all(
           codesAvailable.map(async (code) => {
@@ -306,7 +308,7 @@ exports.bookVoucher = async (req, res) => {
     const reservationsWithOrderId = reservations.map((reservation) => ({...reservation, orderNumber: order.orderNumber}));
     await VoucherReservationHistory.bulkCreate(reservationsWithOrderId);
 
-    sendMailWithVouchers(order, codes);
+    sendMailWithVouchers(order, codes, instructions);
 
     return res.status(201).json({ message: 'Voucher comprado com sucesso.' });
 
