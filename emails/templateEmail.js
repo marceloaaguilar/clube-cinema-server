@@ -3,7 +3,7 @@ function generateVoucherEmail({ customerName, orderNumber, reservationDate, tota
     .map((v) => `<li style="margin-bottom: 6px; font-size: 16px;">🔖 <strong>${v.barCode}</strong></li>`)
     .join('');
 
-  const listaDeInstrucoes = instructions.map(item => `<p>${item}</p>`).join('');
+  const listaDeInstrucoes = (instructions || []).map(item => `<p>${item}</p>`).join('');
 
   return `
     <!DOCTYPE html>

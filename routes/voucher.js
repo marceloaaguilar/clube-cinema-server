@@ -23,12 +23,4 @@ router
   .delete(authController.protect, voucherController.deleteVoucher)
 
 
-
-// router.get('/', voucherController.getAllVouchers);
-// router.get('/:id', voucherController.getVoucherById);
-// router.get('/establishment/:establishmentId', voucherController.getVouchersByEstablishment);
-// router.post(authController.protect, '/', voucherController.createVoucher);
-// router.put('/:id', voucherController.updateVoucher);
-// router.delete('/:id', voucherController.deleteVoucher);
-
 module.exports = router;

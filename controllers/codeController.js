@@ -146,7 +146,7 @@ exports.createManualSale = catchAsync(async(req,res) => {
 
     if (recieveEmail) {
       try {
-        sendMailWithVouchers(orderData, [code]);
+        sendMailWithVouchers(orderData, [code], [voucherFromCode.rules]);
       } catch (emailError) {
         console.warn("Erro ao enviar e-mail:", emailError);
       }
